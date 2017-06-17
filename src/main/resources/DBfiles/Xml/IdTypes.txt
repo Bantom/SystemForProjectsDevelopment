@@ -1,0 +1,10 @@
+<list>
+  <IdTypes>
+    <id>1</id>
+    <type>Customer</type>
+  </IdTypes>
+  <IdTypes>
+    <id>3</id>
+    <type>Customer</type>
+  </IdTypes>
+</list>

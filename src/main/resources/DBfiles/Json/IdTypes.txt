@@ -1,0 +1,3 @@
+{"id":1,"type":"Customer"}
+{"id":2,"type":"Project"}
+{"id":3,"type":"Customer"}

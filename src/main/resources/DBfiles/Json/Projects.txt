@@ -1,0 +1,1 @@
+{"projectId":2,"name":"ProjectName","dateBegin":{"year":2017,"month":1,"dayOfMonth":23,"hourOfDay":10,"minute":25,"second":20},"price":100000.0,"description":"My first project.","customerId":1}

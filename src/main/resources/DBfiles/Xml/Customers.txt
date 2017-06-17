@@ -1,0 +1,16 @@
+<list>
+  <CustomerLight>
+    <personId>1</personId>
+    <email>anton@gmail.com</email>
+    <password>anton123</password>
+    <name>Anton</name>
+    <invoice>123456789</invoice>
+  </CustomerLight>
+  <CustomerLight>
+    <personId>3</personId>
+    <email>vasia@gmail.com</email>
+    <password>vasia123</password>
+    <name>Vasia</name>
+    <invoice>123455678</invoice>
+  </CustomerLight>
+</list>
