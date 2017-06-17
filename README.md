@@ -6,3 +6,5 @@ System can save information using:
   - java serialization
   - xml serialization
   - oracle database
+
+Using meta-model of database to store information.
