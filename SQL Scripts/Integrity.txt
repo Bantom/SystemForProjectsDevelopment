@@ -1,0 +1,17 @@
+ALTER TABLE Objects ADD CONSTRAINT object_id_pk PRIMARY KEY (object_id);
+ALTER TABLE Types ADD CONSTRAINT type_name_pk PRIMARY KEY (type_name);
+ALTER TABLE Attributes ADD CONSTRAINT att_id_pk PRIMARY KEY (att_id);
+ALTER TABLE Attribute_types ADD CONSTRAINT att_type_pk PRIMARY KEY (att_type);
+ALTER TABLE Data ADD CONSTRAINT data_pk PRIMARY KEY (object_id, att_id);
+ALTER TABLE Links ADD CONSTRAINT links_pk PRIMARY KEY (object1_id,object2_id);
+ALTER TABLE Attribute_binds ADD CONSTRAINT attribute_binds_pk PRIMARY KEY (att_id, type_name);
+
+ALTER TABLE Objects ADD CONSTRAINT object_id_parent_fk FOREIGN KEY (object_id_parent) REFERENCES Objects (object_id);
+ALTER TABLE Objects ADD CONSTRAINT type_name_fk FOREIGN KEY (type_name) REFERENCES Types (type_name);
+ALTER TABLE Attributes ADD CONSTRAINT att_type_fk FOREIGN KEY (att_type) REFERENCES Attribute_types (att_type);
+ALTER TABLE Links ADD CONSTRAINT object1_id_fk FOREIGN KEY (object1_id) REFERENCES Objects (object_id);
+ALTER TABLE Links ADD CONSTRAINT object2_id_fk FOREIGN KEY (object2_id) REFERENCES Objects (object_id);
+ALTER TABLE Data ADD CONSTRAINT object_id_fk FOREIGN KEY (object_id) REFERENCES Objects (object_id);
+ALTER TABLE Data ADD CONSTRAINT att_id_fk FOREIGN KEY (att_id) REFERENCES Attributes (att_id);
+ALTER TABLE Attribute_binds ADD CONSTRAINT bind_att_id_fk FOREIGN KEY (att_id) REFERENCES Attributes (att_id);
+ALTER TABLE Attribute_binds ADD CONSTRAINT bind_type_name_fk FOREIGN KEY (type_name) REFERENCES Types (type_name);

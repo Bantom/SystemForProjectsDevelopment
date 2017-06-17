@@ -1,0 +1,17 @@
+create or replace trigger InsertNewObject
+before insert on Objects
+for each row
+begin
+  if :new.object_id is null then
+    select Objects_seq.nextval into :new.object_id from dual;
+  end if;
+end;
+
+create or replace trigger InsertNewAttribute
+before insert on Attributes
+for each row
+begin
+  if :new.att_id is null then
+    select Attributes_seq.nextval into :new.att_id from dual;
+  end if;
+end;

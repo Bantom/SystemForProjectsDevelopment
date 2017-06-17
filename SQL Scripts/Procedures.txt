@@ -1,0 +1,743 @@
+create or replace PROCEDURE getMaxId(
+id OUT VARCHAR2)
+IS
+BEGIN
+  SELECT MAX(Object_id) INTO id FROM OBJECTS;
+  EXCEPTION
+      WHEN OTHERS THEN
+      ROLLBACK;
+END;
+
+create or replace procedure addNewCustomer
+(customerId IN NUMBER,
+customerName IN VARCHAR2,
+customerEmail IN VARCHAR2,
+customerPassword IN VARCHAR2,
+customerInvoice IN NUMBER,
+statusOperation OUT VARCHAR2)
+IS
+  status VARCHAR2(100);
+  CURSOR emailsCursor IS
+    SELECT login, password FROM LOGINPASSWORD;
+BEGIN
+  status := 'true';
+  FOR val IN emailsCursor
+  LOOP
+    IF (val.login = customerEmail) THEN
+      status := 'false';
+    END IF;
+  END LOOP;
+  IF (status = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    INSERT INTO OBJECTS (Object_id, type_name) VALUES (customerId, 'Customer');
+    INSERT INTO DATA (object_id, att_id, value) VALUES (customerId, 1, customerName);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (customerId, 7, customerInvoice);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (customerId, 24, customerPassword);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (customerId, 25, customerEmail);
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END addNewCustomer;
+
+create or replace PROCEDURE addNewUser
+(userId IN NUMBER,
+userName IN VARCHAR2,
+userSurname IN VARCHAR2,
+userSecondName IN VARCHAR2,
+userEmail IN VARCHAR2,
+userPassword IN VARCHAR2,
+userIdentityCode IN VARCHAR2,
+userQualification IN VARCHAR2,
+userRole IN VARCHAR2,
+statusOperation OUT VARCHAR2)
+IS
+  status VARCHAR2(100);
+  statusQualification VARCHAR2(100);
+  qualificationId NUMBER(38);
+  CURSOR emailsCursor IS
+    SELECT login, password FROM LOGINPASSWORD;
+  CURSOR qualificationIdCursor IS
+    SELECT Data.value, Data.object_id FROM Data WHERE OBJECT_ID IN (SELECT Object_id FROM Objects WHERE Objects.TYPE_NAME = 'Qualification');
+BEGIN
+  status := 'true';
+  statusQualification := 'false';
+  FOR val IN emailsCursor
+  LOOP
+    IF (val.login = userEmail) THEN
+      status := 'false';
+    END IF;
+  END LOOP;
+  
+  FOR val IN qualificationIdCursor
+    LOOP
+      IF (val.value = userQualification) THEN
+         statusQualification := 'true';
+         qualificationId := val.object_id;
+      END IF;
+    END LOOP;
+    
+  IF (status = 'true'  AND statusQualification = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    INSERT INTO OBJECTS (Object_id, type_name) VALUES (userId, 'User');
+    INSERT INTO DATA (object_id, att_id, value) VALUES (userId, 1, userName);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (userId, 2, userSurname);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (userId, 3, userSecondName);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (userId, 4, userIdentityCode);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (userId, 6, userRole);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (userId, 24, userPassword);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (userId, 25, userEmail);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (userId, qualificationId, 26);
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END addNewUser;
+
+create or replace procedure addNewTask
+(taskId IN NUMBER,
+taskParentTaskId IN NUMBER,
+taskEstimate IN NUMBER,
+taskQualification IN VARCHAR2,
+taskStatus IN VARCHAR2,
+taskDescription IN VARCHAR2,
+taskSprintId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+  statusSprint VARCHAR2(100);
+  statusParentTask VARCHAR2(100);
+  statusQualification VARCHAR2(100);
+  qualificationId NUMBER(38);
+  CURSOR sprintIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Sprint';
+  CURSOR taskIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Task';
+  CURSOR qualificationIdCursor IS
+    SELECT Data.value, Data.object_id FROM Data WHERE OBJECT_ID IN (SELECT Object_id FROM Objects WHERE Objects.TYPE_NAME = 'Qualification');
+BEGIN
+  statusSprint := 'false';
+  statusParentTask := 'false';
+  statusQualification := 'false';
+  
+  FOR val IN sprintIdCursor
+  LOOP
+    IF (val.object_id = taskSprintId) THEN
+      statusSprint := 'true';
+    END IF;
+  END LOOP;
+  
+  IF (taskParentTaskId = -1) THEN
+    statusParentTask := 'Norecord';
+  ELSE
+    FOR val IN taskIdCursor
+    LOOP
+      IF (val.object_id = taskParentTaskId) THEN
+        statusParentTask := 'true';
+      END IF;
+    END LOOP;
+  END IF;
+  
+  FOR val IN qualificationIdCursor
+    LOOP
+      IF (val.value = taskQualification) THEN
+         statusQualification := 'true';
+         qualificationId := val.object_id;
+      END IF;
+    END LOOP;
+  
+  IF (statusSprint = 'true' AND statusParentTask = 'true' AND statusQualification = 'true') THEN
+    INSERT INTO OBJECTS (Object_id, type_name, object_id_parent) VALUES (taskId, 'Task', taskParentTaskId);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (taskId, 11, taskEstimate);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (taskId, 14, taskDescription);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (taskId, 12, taskStatus);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (taskId, taskSprintId, 18);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (taskParentTaskId, taskId, 19);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (taskId, qualificationId, 26);
+    COMMIT;
+    statusOperation := 'true';
+  ELSIF (statusSprint = 'true' AND statusParentTask = 'Norecord' AND statusQualification = 'true') THEN
+    INSERT INTO OBJECTS (Object_id, type_name) VALUES (taskId, 'Task');
+    INSERT INTO DATA (object_id, att_id, value) VALUES (taskId, 11, taskEstimate);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (taskId, 14, taskDescription);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (taskId, 12, taskStatus);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (taskId, taskSprintId, 18);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (taskId, qualificationId, 26);
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+    WHEN OTHERS THEN 
+      statusOperation := 'false';
+      ROLLBACK;
+END addNewTask;
+
+create or replace procedure addNewSprint
+(sprintId IN NUMBER,
+sprintName IN VARCHAR2,
+sprintEstimate IN NUMBER,
+sprintDescription IN VARCHAR2,
+sprintDateBegin IN DATE,
+sprintDateEnd IN DATE,
+sprintProjectId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+status VARCHAR2(100);
+  CURSOR projectIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Project';
+BEGIN
+  status := 'false';
+  FOR val IN projectIdCursor
+  LOOP
+    IF (val.object_id = sprintProjectId) THEN
+      status := 'true';
+    END IF;
+  END LOOP;
+  IF (status = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    INSERT INTO OBJECTS (Object_id, type_name) VALUES (sprintId, 'Sprint');
+    INSERT INTO DATA (object_id, att_id, value) VALUES (sprintId, 1, sprintName);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (sprintId, 8, TO_CHAR(sprintDateBegin));
+    INSERT INTO DATA (object_id, att_id, value) VALUES (sprintId, 9, To_CHAR(sprintDateEnd));
+    INSERT INTO DATA (object_id, att_id, value) VALUES (sprintId, 11, sprintEstimate);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (sprintId, 14, sprintDescription);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (sprintId, sprintProjectId, 17);
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END addNewSprint;
+
+create or replace procedure addNewRequest
+(requestId IN NUMBER,
+requestCurrentDate IN DATE,
+requestDescription IN VARCHAR2,
+requestHours IN NUMBER,
+requestTaskId IN NUMBER,
+requestUserId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+  statusUser VARCHAR2(100);
+  statusTask VARCHAR2(100);
+  CURSOR userIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'User';
+  CURSOR taskIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Task';
+BEGIN
+  statusUser := 'false';
+  statusTask := 'false';
+  FOR val IN userIdCursor
+  LOOP
+    IF (val.object_id = requestUserId) THEN
+      statusUser := 'true';
+    END IF;
+  END LOOP;
+  
+  FOR val IN taskIdCursor
+  LOOP
+    IF (val.object_id = requestTaskId) THEN
+      statusTask := 'true';
+    END IF;
+  END LOOP;
+  IF (statusUser = 'true' AND statusTask = 'true') THEN
+    INSERT INTO OBJECTS (Object_id, type_name) VALUES (requestId, 'DoTasks');
+    INSERT INTO DATA (object_id, att_id, value) VALUES (requestId, 13, TO_CHAR(requestCurrentDate));
+    INSERT INTO DATA (object_id, att_id, value) VALUES (requestId, 15, requestHours);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (requestId, 14, requestDescription);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (requestId, requestTaskId, 23);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (requestId, requestUserId, 22);
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END addNewRequest;
+
+create or replace procedure addNewProject
+(projectId IN NUMBER,
+projectName IN VARCHAR2,
+projectPrice IN NUMBER,
+projectDescription IN VARCHAR2,
+projectDateBegin IN DATE,
+projectDateEnd IN DATE,
+projectCustomerId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+status VARCHAR2(100);
+  CURSOR customerIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Customer';
+BEGIN
+  status := 'false';
+  FOR val IN customerIdCursor
+  LOOP
+    IF (val.object_id = projectCustomerId) THEN
+      status := 'true';
+    END IF;
+  END LOOP;
+  IF (status = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    INSERT INTO OBJECTS (Object_id, type_name) VALUES (projectId, 'Project');
+    INSERT INTO DATA (object_id, att_id, value) VALUES (projectId, 1, projectName);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (projectId, 8, TO_CHAR(projectDateBegin));
+    INSERT INTO DATA (object_id, att_id, value) VALUES (projectId, 9, To_CHAR(projectDateEnd));
+    INSERT INTO DATA (object_id, att_id, value) VALUES (projectId, 10, projectPrice);
+    INSERT INTO DATA (object_id, att_id, value) VALUES (projectId, 14, projectDescription);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (projectId, projectCustomerId, 16);
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END addNewProject;
+
+create or replace procedure addNewDoTask
+(doTaskId IN NUMBER,
+doTaskDateBegin IN DATE,
+doTaskDateEnd IN DATE,
+doTaskTaskId IN NUMBER,
+doTaskUserId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+  statusUser VARCHAR2(100);
+  statusTask VARCHAR2(100);
+  CURSOR userIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'User';
+  CURSOR taskIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Task';
+BEGIN
+  statusUser := 'false';
+  statusTask := 'false';
+  FOR val IN userIdCursor
+  LOOP
+    IF (val.object_id = doTaskUserId) THEN
+      statusUser := 'true';
+    END IF;
+  END LOOP;
+  
+  FOR val IN taskIdCursor
+  LOOP
+    IF (val.object_id = doTaskTaskId) THEN
+      statusTask := 'true';
+    END IF;
+  END LOOP;
+  IF (statusUser = 'true' AND statusTask = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    INSERT INTO OBJECTS (Object_id, type_name) VALUES (doTaskId, 'DoTasks');
+    INSERT INTO DATA (object_id, att_id, value) VALUES (doTaskId, 8, TO_CHAR(doTaskDateBegin));
+    INSERT INTO DATA (object_id, att_id, value) VALUES (doTaskId, 9, TO_CHAR(doTaskDateEnd));
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (doTaskId, doTaskTaskId, 21);
+    INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (doTaskId, doTaskUserId, 20);
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END addNewDoTask;
+
+create or replace PROCEDURE getDate
+(objectId IN NUMBER,
+attId IN NUMBER,
+objectDate OUT DATE)
+IS
+BEGIN
+  SELECT TO_DATE(Data.value) INTO objectDate FROM Data WHERE Object_id = objectId AND ATT_ID = attId;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    ROLLBACK;
+END getDate;
+
+create or replace PROCEDURE updateUser
+(userId IN NUMBER,
+userName IN VARCHAR2,
+userSurname IN VARCHAR2,
+userSecondName IN VARCHAR2,
+userEmail IN VARCHAR2,
+userPassword IN VARCHAR2,
+userIdentityCode IN VARCHAR2,
+userQualification IN VARCHAR2,
+userRole IN VARCHAR2,
+userBossId IN NUMBER,
+statusOperation OUT VARCHAR2)
+IS
+  status VARCHAR2(100);
+  statusQualification VARCHAR2(100);
+  qualificationId NUMBER(38);
+  statusBoss VARCHAR2(100);
+  CURSOR emailsCursor IS
+    SELECT login, password, id FROM LOGINPASSWORD;
+  CURSOR qualificationIdCursor IS
+    SELECT Data.value, Data.object_id FROM Data WHERE OBJECT_ID IN (SELECT Object_id FROM Objects WHERE Objects.TYPE_NAME = 'Qualification');
+  CURSOR managerCursor IS
+    SELECT Object_id id FROM DATA WHERE VALUE = 'Manager' AND ATT_ID IN (SELECT att_id FROM Attributes WHERE name = 'Role');
+BEGIN
+  status := 'true';
+  statusQualification := 'false';
+  statusBoss := 'false';
+  
+  FOR val IN emailsCursor
+  LOOP
+    IF (val.login = userEmail AND val.id <> userId) THEN
+      status := 'false';
+    END IF;
+  END LOOP;
+  
+  FOR val IN managerCursor
+  LOOP
+    IF (val.id = userBossId) THEN
+      statusBoss := 'true';
+    END IF;
+  END LOOP;
+  
+  FOR val IN qualificationIdCursor
+    LOOP
+      IF (val.value = userQualification) THEN
+         statusQualification := 'true';
+         qualificationId := val.object_id;
+      END IF;
+    END LOOP;
+    
+  IF (status = 'true'  AND statusQualification = 'true' AND statusBoss = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    UPDATE OBJECTS SET OBJECT_ID_PARENT = userBossId WHERE object_id = userId;
+    UPDATE DATA SET VALUE = userName WHERE object_id = userId AND att_id = 1;
+    UPDATE DATA SET VALUE = userSurname WHERE object_id = userId AND att_id = 2;
+    UPDATE DATA SET VALUE = userSecondName WHERE object_id = userId AND att_id = 3;
+    UPDATE DATA SET VALUE = userIdentityCode WHERE object_id = userId AND att_id = 4;
+    UPDATE DATA SET VALUE = userRole WHERE object_id = userId AND att_id = 6;
+    UPDATE DATA SET VALUE = userPassword WHERE object_id = userId AND att_id = 24;
+    UPDATE DATA SET VALUE = userEmail WHERE object_id = userId AND att_id = 25;
+    UPDATE LINKS SET OBJECT2_ID = qualificationId WHERE OBJECT1_ID = userId AND ATT_ID = 26;
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END updateUser;
+
+create or replace procedure updateTask
+(taskId IN NUMBER,
+taskParentTaskId IN NUMBER,
+taskEstimate IN NUMBER,
+taskQualification IN VARCHAR2,
+taskStatus IN VARCHAR2,
+taskDescription IN VARCHAR2,
+taskSprintId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS
+  oldParentId NUMBER(38);
+  statusSprint VARCHAR2(100);
+  statusParentTask VARCHAR2(100);
+  statusQualification VARCHAR2(100);
+  qualificationId NUMBER(38);
+  CURSOR sprintIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Sprint';
+  CURSOR taskIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Task';
+  CURSOR qualificationIdCursor IS
+    SELECT Data.value, Data.object_id FROM Data WHERE OBJECT_ID IN (SELECT Object_id FROM Objects WHERE Objects.TYPE_NAME = 'Qualification');
+  CURSOR parentIdCursor IS
+    SELECT Object_id, Object_id_parent FROM OBJECTS WHERE TYPE_NAME = 'Task';
+BEGIN
+  statusSprint := 'false';
+  statusParentTask := 'false';
+  statusQualification := 'false';
+  
+  FOR val IN sprintIdCursor
+  LOOP
+    IF (val.object_id = taskSprintId) THEN
+      statusSprint := 'true';
+    END IF;
+  END LOOP;
+  
+  IF (taskParentTaskId = -1) THEN
+    statusParentTask := 'Norecord';
+  ELSE
+    FOR val IN taskIdCursor
+    LOOP
+      IF (val.object_id = taskParentTaskId) THEN
+        statusParentTask := 'true';
+      END IF;
+    END LOOP;
+  END IF;
+  
+  FOR val IN qualificationIdCursor
+    LOOP
+      IF (val.value = taskQualification) THEN
+         statusQualification := 'true';
+         qualificationId := val.object_id;
+      END IF;
+    END LOOP;
+  
+  FOR val IN parentIdCursor
+    LOOP
+      IF (val.object_id = taskId) THEN
+         oldParentId := val.object_id_parent;
+      END IF;
+    END LOOP;
+  
+  IF (statusSprint = 'true' AND statusQualification = 'true') THEN
+    IF (statusParentTask = 'true' AND (oldParentId IS NULL)) THEN
+      UPDATE OBJECTS SET OBJECT_ID_PARENT = taskParentTaskId WHERE Object_id = taskId;
+      INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (taskParentTaskId, taskId, 19);
+    ELSIF (statusParentTask = 'Norecord' AND (oldParentId IS NOT NULL)) THEN
+      UPDATE OBJECTS SET OBJECT_ID_PARENT = NULL WHERE Object_id = taskId;
+      DELETE LINKS WHERE Object1_id = oldParentId AND Object2_id = taskId AND att_id = 19;
+    ELSE
+      UPDATE OBJECTS SET OBJECT_ID_PARENT = taskParentTaskId WHERE Object_id = taskId;
+      DELETE LINKS WHERE Object1_id = oldParentId AND Object2_id = taskId AND att_id = 19;
+      INSERT INTO LINKS (Object1_id, object2_id, att_id) VALUES (taskParentTaskId, taskId, 19);
+    END IF;
+        
+    UPDATE DATA SET VALUE = taskEstimate WHERE Object_id = taskId AND att_id = 11;
+    UPDATE DATA SET VALUE = taskDescription WHERE Object_id = taskId AND att_id = 14; 
+    UPDATE DATA SET VALUE = taskStatus WHERE Object_id = taskId AND att_id = 12; 
+    UPDATE LINKS SET OBJECT2_ID = qualificationId WHERE OBJECT1_ID = taskId AND ATT_ID = 26;
+
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+    WHEN OTHERS THEN 
+      statusOperation := 'false';
+      ROLLBACK;
+END updateTask;
+
+create or replace procedure updateSprint
+(sprintId IN NUMBER,
+sprintName IN VARCHAR2,
+sprintEstimate IN NUMBER,
+sprintDescription IN VARCHAR2,
+sprintDateBegin IN DATE,
+sprintDateEnd IN DATE,
+sprintProjectId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+status VARCHAR2(100);
+  CURSOR projectIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Project';
+BEGIN
+  status := 'false';
+  FOR val IN projectIdCursor
+  LOOP
+    IF (val.object_id = sprintProjectId) THEN
+      status := 'true';
+    END IF;
+  END LOOP;
+  IF (status = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    UPDATE DATA SET VALUE = sprintName WHERE object_id = sprintId AND att_id = 1;
+    UPDATE DATA SET VALUE = TO_CHAR(sprintDateBegin) WHERE object_id = sprintId AND att_id = 8;
+    UPDATE DATA SET VALUE = To_CHAR(sprintDateEnd) WHERE object_id = sprintId AND att_id = 9;
+    UPDATE DATA SET VALUE = sprintEstimate WHERE object_id = sprintId AND att_id = 11;
+    UPDATE DATA SET VALUE = sprintDescription WHERE object_id = sprintId AND att_id = 14;
+    UPDATE LINKS SET OBJECT2_ID = sprintProjectId WHERE OBJECT1_ID = sprintId AND ATT_ID = 17;
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END updateSprint;
+
+create or replace procedure updateRequest
+(requestId IN NUMBER,
+requestCurrentDate IN DATE,
+requestDescription IN VARCHAR2,
+requestHours IN NUMBER,
+requestTaskId IN NUMBER,
+requestUserId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+  statusUser VARCHAR2(100);
+  statusTask VARCHAR2(100);
+  CURSOR userIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'User';
+  CURSOR taskIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Task';
+BEGIN
+  statusUser := 'false';
+  statusTask := 'false';
+  FOR val IN userIdCursor
+  LOOP
+    IF (val.object_id = requestUserId) THEN
+      statusUser := 'true';
+    END IF;
+  END LOOP;
+  
+  FOR val IN taskIdCursor
+  LOOP
+    IF (val.object_id = requestTaskId) THEN
+      statusTask := 'true';
+    END IF;
+  END LOOP;
+  IF (statusUser = 'true' AND statusTask = 'true') THEN
+    UPDATE DATA SET VALUE = requestHours WHERE Object_id = requestId AND att_id = 15;
+    UPDATE DATA SET VALUE = requestDescription WHERE Object_id = requestId AND att_id = 14;
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END updateRequest;
+
+create or replace procedure updateProject
+(projectId IN NUMBER,
+projectName IN VARCHAR2,
+projectPrice IN NUMBER,
+projectDescription IN VARCHAR2,
+projectDateBegin IN DATE,
+projectDateEnd IN DATE,
+projectCustomerId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+status VARCHAR2(100);
+  CURSOR customerIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Customer';
+BEGIN
+  status := 'false';
+  FOR val IN customerIdCursor
+  LOOP
+    IF (val.object_id = projectCustomerId) THEN
+      status := 'true';
+    END IF;
+  END LOOP;
+  IF (status = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    UPDATE DATA SET VALUE = projectName WHERE object_id = projectId AND att_id = 1;
+    UPDATE DATA SET VALUE = TO_CHAR(projectDateBegin) WHERE object_id = projectId AND att_id = 8;
+    UPDATE DATA SET VALUE = TO_CHAR(projectDateEnd) WHERE object_id = projectId AND att_id = 9;
+    UPDATE DATA SET VALUE = projectPrice WHERE object_id = projectId AND att_id = 10;
+    UPDATE DATA SET VALUE = projectDescription WHERE object_id = projectId AND att_id = 14;
+    UPDATE LINKS SET OBJECT2_ID = projectCustomerId WHERE OBJECT1_ID = projectId AND ATT_ID = 16;
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END updateProject;
+
+create or replace procedure updateDoTask
+(doTaskId IN NUMBER,
+doTaskDateBegin IN DATE,
+doTaskDateEnd IN DATE,
+doTaskTaskId IN NUMBER,
+doTaskUserId IN NUMBER,
+statusOperation OUT VARCHAR)
+IS 
+  statusUser VARCHAR2(100);
+  statusTask VARCHAR2(100);
+  CURSOR userIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'User';
+  CURSOR taskIdCursor IS
+    SELECT object_id FROM Objects WHERE type_name = 'Task';
+BEGIN
+  statusUser := 'false';
+  statusTask := 'false';
+  FOR val IN userIdCursor
+  LOOP
+    IF (val.object_id = doTaskUserId) THEN
+      statusUser := 'true';
+    END IF;
+  END LOOP;
+  
+  FOR val IN taskIdCursor
+  LOOP
+    IF (val.object_id = doTaskTaskId) THEN
+      statusTask := 'true';
+    END IF;
+  END LOOP;
+  IF (statusUser = 'true' AND statusTask = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    UPDATE DATA SET VALUE = TO_CHAR(doTaskDateBegin) WHERE Object_id = doTaskId AND att_id = 8;
+    UPDATE DATA SET VALUE = TO_CHAR(doTaskDateEnd) WHERE Object_id = doTaskId AND att_id = 9;
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END updateDoTask;
+
+create or replace procedure updateCustomer
+(customerId IN NUMBER,
+customerName IN VARCHAR2,
+customerEmail IN VARCHAR2,
+customerPassword IN VARCHAR2,
+customerInvoice IN NUMBER,
+statusOperation OUT VARCHAR2)
+IS
+  status VARCHAR2(100);
+  CURSOR emailsCursor IS
+    SELECT login, password, id FROM LOGINPASSWORD;
+BEGIN
+  status := 'true';
+  FOR val IN emailsCursor
+  LOOP
+    IF (val.login = customerEmail AND val.id <> customerId) THEN
+      status := 'false';
+    END IF;
+  END LOOP;
+  IF (status = 'true') THEN
+    SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+    UPDATE DATA SET VALUE = customerName WHERE object_id = customerId AND att_id = 1;
+    UPDATE DATA SET VALUE = customerInvoice WHERE object_id = customerId AND att_id = 7;
+    UPDATE DATA SET VALUE = customerPassword WHERE object_id = customerId AND att_id = 24;
+    UPDATE DATA SET VALUE = customerEmail WHERE object_id = customerId AND att_id = 25;
+    COMMIT;
+    statusOperation := 'true';
+  ELSE
+    statusOperation := 'false';
+  END IF;
+  EXCEPTION
+  WHEN OTHERS THEN 
+    statusOperation := 'false';
+    ROLLBACK;
+END updateCustomer;

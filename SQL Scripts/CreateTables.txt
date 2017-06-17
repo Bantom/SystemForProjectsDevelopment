@@ -1,0 +1,46 @@
+CREATE TABLE Objects
+(
+  object_id NUMBER(38),
+  object_id_parent NUMBER(38),
+  type_name VARCHAR2(100)
+);
+
+CREATE TABLE Types
+(
+  type_name VARCHAR2(100)
+);
+
+CREATE TABLE Attributes
+(
+  att_id NUMBER(38),
+  name VARCHAR2(100),
+  att_type VARCHAR2(100)
+);
+
+CREATE TABLE Attribute_types
+(
+  att_type VARCHAR2(100)
+);
+
+CREATE TABLE Data
+(
+  object_id NUMBER(38),
+  att_id NUMBER(38),
+  value VARCHAR2(100)
+);
+
+CREATE TABLE Links
+(
+  object1_id NUMBER(38),
+  object2_id NUMBER(38),
+  att_id NUMBER(38)
+);
+
+CREATE TABLE Attribute_binds
+(
+  att_id NUMBER(38),
+  type_name VARCHAR2(100)
+);
+
+AlTER TABLE attributes
+ADD multiple VARCHAR2(10);
